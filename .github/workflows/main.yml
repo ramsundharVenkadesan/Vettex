@@ -10,9 +10,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      # Optional: Add redis/postgres here if your app eventually needs them
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
