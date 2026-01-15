@@ -125,6 +125,42 @@ vettex-due-diligence/
 
 ---
 
+# 🛠 Troubleshooting: SSL Certificate Verification & Agent Resiliency
+
+While running the **Vettex Technical Due Diligence Agent**, you may encounter a connection error when the agent attempts to use the search tool. This document explains why this happens and how the system's architecture handles it.
+
+---
+
+## 🚨 The Error: SSL Certificate Verification Failed
+
+### **Error Log**
+`ClientConnectorCertificateError: ... [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1028)`
+
+### **Description**
+This error occurs because the local Python environment (specifically the `aiohttp` library used by `langchain_tavily`) cannot verify the identity of the remote server at `api.tavily.com`. 
+
+**Key reasons for this failure:**
+* **Missing CA Bundle:** Your machine lacks the local list of Certificate Authorities (CA) required to validate the SSL/TLS certificate provided by the API.
+* **macOS Configuration:** Python on macOS often does not automatically link to the system's root certificates, requiring a manual installation of the cert bundle.
+
+---
+
+## 🧠 Agent Self-Correction (ReAct Framework)
+
+One of the defining features of this agent is its **resiliency**. Even when the `TavilySearch` tool fails due to an SSL error, the application does not crash. Instead, it utilizes the **ReAct (Reasoning and Acting)** loop to adapt.
+
+### **How it Works**
+
+1.  **Error as Observation:** The `AgentExecutor` in `main.py` is configured with `handle_parsing_errors=True`. When the tool fails, the framework catches the exception and returns the error string to the LLM as an **Observation**.
+2.  **Reasoning Loop:** The LLM (Gemini) reads the error in its "scratchpad". It recognizes that the search action failed and reflects on this in its next **Thought** step.
+3.  **Graceful Degradation:** According to the `REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS`, the agent is directed to use tools for proof but avoid hallucinations. 
+    * If a search fails, the agent may attempt to answer based on its internal training data (Internal Knowledge Fallback).
+    * It will prioritize providing a high-level technical verdict over crashing, while noting that live data retrieval was limited.
+
+
+
+---
+
 ## ⚠️ Disclaimer
 
 Vettex is an assistive due diligence tool and should not replace professional investment advice.
