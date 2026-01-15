@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Form
 from dotenv import load_dotenv # Import function to load environment variables
 
-
+import asyncio, json
 from langchain_classic.agents import AgentExecutor # Import system to execute tools
 from langchain_classic.agents.react.agent import create_react_agent # Import function to create a react agent
 
@@ -20,7 +20,22 @@ from pydantic import BaseModel, Field
 from starlette import status
 
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+from langchain_core.callbacks.base import AsyncCallbackHandler
+
+class WebStreamCallbackHandler(AsyncCallbackHandler):
+    def __init__(self, queue):
+        self.queue = queue
+
+    async def on_agent_action(self, action, **kwargs):
+        # Capture the Thought and Action
+        thought = action.log.split("Action:")[0].strip()
+        await self.queue.put(f"THOUGHT: {thought}")
+        await self.queue.put(f"ACTION: Investigating via {action.tool}...")
+
+    async def on_tool_end(self, output, **kwargs):
+        # Capture that a tool finished
+        await self.queue.put(f"OBSERVATION: Data retrieved successfully.")
 
 load_dotenv() # Load the environment variables
 app = FastAPI()
@@ -51,9 +66,29 @@ async def index(request:Request):
 
 @app.post("/", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
 async def analyze(request:Request, company_name:str=Form(...), url:str=Form(...)):
-    task_description = (
-        f"Perform a technical due diligence analysis on {company_name}. "
-        f"Start by visiting their website at {url}."
-    )
-    result = get_agent().invoke({"input": task_description})
-    return templates.TemplateResponse("report.html", {"request": request, "company_name": company_name, "data": result})
+    async def event_generator():
+        queue = asyncio.Queue()
+        handler = WebStreamCallbackHandler(queue)
+        task_description = f"Perform technical due diligence on {company_name} at {url}."
+
+        # Start agent in background
+        agent_task = asyncio.create_task(
+            get_agent().ainvoke({"input": task_description}, config={"callbacks": [handler]})
+        )
+
+        # 1. Stream the logs as they happen
+        while not agent_task.done() or not queue.empty():
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=0.2)
+                yield f"data: {json.dumps({'type': 'log', 'content': msg})}\n\n"
+            except asyncio.TimeoutError:
+                continue
+
+        # 2. Stream the final HTML report
+        result = await agent_task
+        final_html = templates.get_template("report.html").render({
+            "request": request, "company_name": company_name, "data": result
+        })
+        yield f"data: {json.dumps({'type': 'final', 'content': final_html})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
