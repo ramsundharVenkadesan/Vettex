@@ -14,6 +14,12 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* --- ADD THIS SECTION --- */
+        #terminal p {
+            white-space: pre-wrap;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body class="bg-slate-50 font-sans text-slate-900">
@@ -93,8 +99,19 @@ form.addEventListener('submit', async (e) => {
 
             if (data.type === 'log') {
                 const p = document.createElement('p');
+
+                // Color coding based on Agent reasoning step
+                if (data.content.startsWith("THOUGHT:")) {
+                    p.className = "text-emerald-300 border-l-2 border-emerald-500 pl-3";
+                } else if (data.content.startsWith("ACTION:")) {
+                    p.className = "text-amber-300 font-bold border-l-2 border-amber-500 pl-3";
+                } else if (data.content.startsWith("OBSERVATION:")) {
+                    p.className = "text-sky-300 border-l-2 border-sky-500 pl-3";
+                } else {
+                    p.className = "text-slate-400 border-l-2 border-slate-600 pl-3";
+                }
+
                 p.textContent = `> ${data.content}`;
-                p.className = "mb-1 border-l-2 border-emerald-800 pl-2";
                 terminal.appendChild(p);
                 terminal.scrollTop = terminal.scrollHeight;
             } else if (data.type === 'final') {

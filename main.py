@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Request, Form
 from dotenv import load_dotenv # Import function to load environment variables
 
+import os
+import certifi
+
 import asyncio, json
 from langchain_classic.agents import AgentExecutor # Import system to execute tools
 from langchain_classic.agents.react.agent import create_react_agent # Import function to create a react agent
@@ -23,15 +26,28 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse
 from langchain_core.callbacks.base import AsyncCallbackHandler
 
+os.environ['SSL_CERT_FILE'] = certifi.where()
+
 class WebStreamCallbackHandler(AsyncCallbackHandler):
     def __init__(self, queue):
         self.queue = queue
 
     async def on_agent_action(self, action, **kwargs):
-        # Capture the Thought and Action
-        thought = action.log.split("Action:")[0].strip()
-        await self.queue.put(f"THOUGHT: {thought}")
-        await self.queue.put(f"ACTION: Investigating via {action.tool}...")
+        # Use split to separate the Thought from the Action call
+        # often 'Action:' is the delimiter used by ReAct agents
+        if "Action:" in action.log:
+            parts = action.log.split("Action:")
+            thought = parts[0].replace("Thought:", "").strip()
+
+            # Put Thought and Action into the queue as separate messages
+            if thought:
+                await self.queue.put(f"THOUGHT: {thought}")
+
+            # Express the action clearly
+            await self.queue.put(f"ACTION: Invoking {action.tool} with input {action.tool_input}")
+        else:
+            # Fallback if the format is unexpected
+            await self.queue.put(f"LOG: {action.log.strip()}")
 
     async def on_tool_end(self, output, **kwargs):
         # Capture that a tool finished

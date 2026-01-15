@@ -30,6 +30,14 @@
                 <p class="leading-relaxed text-slate-700">{{ data.technical }}</p>
             </section>
 
+            <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+                <h2 class="text-xl font-bold mb-4 flex items-center">
+                    <span class="bg-emerald-100 text-emerald-600 p-2 rounded-lg mr-3">👨🏼‍💻</span>
+                    Developer Sentiment
+                </h2>
+                <p class="leading-relaxed text-slate-700">{{ data.developer_sentiment }}</p>
+            </section>
+
             <section>
                 <h2 class="text-xl font-bold mb-6 text-red-600 flex items-center">
                     <span class="bg-red-100 p-2 rounded-lg mr-3">🚩</span> Critical Risks
@@ -47,6 +55,20 @@
                 <h2 class="text-xl font-bold mb-3 uppercase tracking-wider text-indigo-200">The Verdict</h2>
                 <p class="text-lg font-medium leading-snug">{{ data.verdict }}</p>
             </section>
+
+            <section class="bg-indigo-700 p-8 rounded-xl shadow-lg text-white">
+    <h2 class="text-xl font-bold mb-3 uppercase tracking-wider text-indigo-200">Sources</h2>
+    {% for source in data.sources %}
+        <p class="text-lg font-medium leading-snug">
+            {# The 'external' attribute ensures the browser treats it as a full URL #}
+            <a href="{{ source if '://' in source else 'https://' + source }}"
+               target="_blank"
+               class="underline hover:text-indigo-300">
+               {{ source }}
+            </a>
+        </p>
+    {% endfor %}
+</section>
         </div>
     </div>
 </body>
