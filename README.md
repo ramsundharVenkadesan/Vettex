@@ -1,47 +1,136 @@
-# Vettex: Autonomous Technical Due Diligence Agent
+# Vettex | Autonomous Technical Due Diligence Agent
 
-Vettex is an AI-powered intelligence tool designed for Venture Capitalists and technical analysts. It performs automated technical due diligence by investigating a company's claims against real-world data, engineering blogs, and developer sentiment.
-
-Instead of simply summarizing a landing page, the agent treats marketing claims as hypotheses and attempts to verify them via live web searches using a **ReAct (Reasoning and Acting) loop**.
+Vettex is a specialized AI agent designed for Venture Capital analysts to conduct **rapid, evidence-based technical due diligence**. By leveraging LangChain’s ReAct framework and Google Gemini, it cross-references marketing claims against **live technical data** (GitHub, documentation, engineering blogs) to assess a company’s true technical defensibility.
 
 ---
 
 ## 🚀 Features
 
-* **Live Web Intelligence**: Integrated with **Tavily Search** to crawl GitHub, technical documentation, and forums.
-* **Reasoning-First Approach**: Powered by **Google Gemini 3 Flash**, using a custom ReAct prompt that enforces skepticism and evidence-based analysis.
-* **Real-time Progress Streaming**: Uses **Server-Sent Events (SSE)** to stream the agent's "Thoughts," "Actions," and "Observations" to a terminal-style UI.
-* [cite_start]**Structured Technical Reports**: Automatically parses findings into a professional HTML report using **Pydantic** validation and **Jinja2** templates.
+- **Live Web Research**  
+  Uses Tavily Search to find real-time technical proof and supporting evidence.
+
+- **Streaming Logs**  
+  Watch the agent’s internal *Thoughts* and *Actions* stream live in a terminal-style UI.
+
+- **Structured Analysis**  
+  Automatically generates a detailed report covering:
+  - Value Proposition  
+  - Technical Architecture  
+  - Developer Sentiment  
+  - Red Flags & Risks  
+  - Final Investment Verdict
+
+- **Modern UI**  
+  Built with FastAPI, Tailwind CSS, and Jinja2 templates for a clean, responsive experience.
 
 ---
 
-## 🛠️ Architecture
+## 🛠️ Prerequisites
 
+Before running the application, ensure you have:
 
-
-The system is built on a modern AI stack:
-* **Backend**: FastAPI (Python)
-* **Agent Framework**: LangChain (Classic & Core)
-* **LLM**: Google Gemini 3 Flash
-* **Search Engine**: Tavily AI
-* **Frontend**: Tailwind CSS & Vanilla JS (for SSE streaming)
+- **Python 3.9+** installed
+- API keys for the following services:
+  - **Google Gemini** – powers the agent’s reasoning  
+  - **Tavily AI** – enables real-time web search
 
 ---
 
-## 🚦 Getting Started
+## 📥 Installation
 
-### 1. Environment Setup
-Create a `.env` file in the root directory and add your API keys:
-```env
-GOOGLE_API_KEY=your_gemini_api_key
-TAVILY_API_KEY=your_tavily_api_key
+```bash
+cd vettex-due-diligence
+python -m venv venv
+```
 
-### 2. Installation
-Install the dependencies listed in the requirements.txt:
-```env
+Activate the virtual environment:
+
+**Windows**
+```bash
+venv\Scripts\activate
+```
+
+**macOS / Linux**
+```bash
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
+```
 
-### 3. Run the Application
-Start the server using Uvicorn:
+---
+
+## ⚙️ Configuration
+
+Create a `.env` file in the project root:
+
 ```env
+GOOGLE_API_KEY=your_gemini_api_key_here
+TAVILY_API_KEY=your_tavily_api_key_here
+```
+
+---
+
+## 🏃 Running the Application
+
+```bash
 uvicorn main:app --reload
+```
+
+Open your browser:
+
+```
+http://127.0.0.1:8000
+```
+
+---
+
+## 📖 How to Use
+
+1. Enter the company name and official website URL  
+2. Click **Start Technical Audit**  
+3. Watch live agent reasoning in the terminal UI  
+4. Review the generated Technical Intelligence Report
+
+---
+
+## 🏗️ Project Structure
+
+```
+vettex-due-diligence/
+│
+├── main.py
+├── prompt.py
+├── schema.py
+├── requirements.txt
+├── templates/
+│   ├── index.html
+│   └── report.html
+└── .env
+```
+
+---
+
+## 🧠 Core Technologies
+
+- LangChain (ReAct)
+- Google Gemini
+- Tavily Search
+- FastAPI
+- Tailwind CSS
+- Jinja2
+
+---
+
+## ⚠️ Disclaimer
+
+Vettex is an assistive due diligence tool and should not replace professional investment advice.
+
+---
+
+## 📄 License
+
+MIT License
