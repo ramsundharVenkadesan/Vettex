@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vettex | Due Diligence Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+    <div class="max-w-4xl mx-auto py-12 px-6">
+        <header class="mb-12 border-b border-slate-200 pb-8">
+            <h1 class="text-3xl font-bold text-indigo-700">Technical Intelligence Report</h1>
+            <p class="text-slate-500 mt-2">Analysis for: <span class="font-semibold text-slate-800">{{ company_name }}</span></p>
+        </header>
+
+        <div class="space-y-8">
+            <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+                <h2 class="text-xl font-bold mb-4 flex items-center">
+                    <span class="bg-indigo-100 text-indigo-600 p-2 rounded-lg mr-3">🎯</span>
+                    Strategic Value Proposition
+                </h2>
+                <p class="leading-relaxed text-slate-700">{{ data.value_proposition_analysis }}</p>
+            </section>
+
+            <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+                <h2 class="text-xl font-bold mb-4 flex items-center">
+                    <span class="bg-emerald-100 text-emerald-600 p-2 rounded-lg mr-3">💻</span>
+                    Technical Defensibility
+                </h2>
+                <p class="leading-relaxed text-slate-700">{{ data.technical }}</p>
+            </section>
+
+            <section>
+                <h2 class="text-xl font-bold mb-6 text-red-600 flex items-center">
+                    <span class="bg-red-100 p-2 rounded-lg mr-3">🚩</span> Critical Risks
+                </h2>
+                <div class="grid md:grid-cols-2 gap-4">
+                    {% for flag in data.red_flags %}
+                    <div class="bg-red-50 p-5 rounded-lg border border-red-100 text-red-800 text-sm italic">
+                        "{{ flag }}"
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="bg-indigo-700 p-8 rounded-xl shadow-lg text-white">
+                <h2 class="text-xl font-bold mb-3 uppercase tracking-wider text-indigo-200">The Verdict</h2>
+                <p class="text-lg font-medium leading-snug">{{ data.verdict }}</p>
+            </section>
+        </div>
+    </div>
+</body>
+</html>
