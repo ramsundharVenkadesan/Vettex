@@ -2,18 +2,28 @@ name: Deploy Vettex to Cloud Run
 
 on:
   push:
-    branches: [ main ]  # Triggers deployment when you push to the main branch
+    branches: [ main ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
-      id-token: 'write' # Required for Workload Identity Federation
+      id-token: 'write'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      # This step ensures the Dockerfile is present and correctly named
+      - name: Verify Dockerfile
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "Dockerfile found!"
+          else
+            echo "ERROR: Dockerfile not found. Ensure the filename is exactly 'Dockerfile' (case-sensitive)."
+            exit 1
+          fi
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -26,7 +36,7 @@ jobs:
         with:
           service: vettex-service
           region: us-central1
-          source: . # Automatically builds your Dockerfile
+          source: .  # This flag tells Cloud Run to look for your 'Dockerfile' in the root
           env_vars: |
             GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
             TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
