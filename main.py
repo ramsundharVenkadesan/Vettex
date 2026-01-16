@@ -1,110 +1,75 @@
-from fastapi import FastAPI, Request, Form
 from dotenv import load_dotenv # Import function to load environment variables
+import os, certifi # Import package to interact with Operating System (OS) and provide a collection of Root Certificates to connect to websites or APIs
+import asyncio # Import engine that allows code to perform multiple tasks at once
+import json # Import package to convert dictionaries into JSON strings for front-end processing
 
-import os
-import certifi
+from agent import get_agent # Import the AI agent
 
-import asyncio, json
-from langchain_classic.agents import AgentExecutor # Import system to execute tools
-from langchain_classic.agents.react.agent import create_react_agent # Import function to create a react agent
+from pydantic import BaseModel, Field # Import classes from Pydantic library to define, format, and validate data
+from starlette import status # Import a library of human-readable HTTP codes
 
-from langchain_google_genai import ChatGoogleGenerativeAI # Import the LLM that will be used by the agent
-from langchain_tavily import TavilySearch # Import LangChain integrated Tavily search
+from fastapi.templating import Jinja2Templates # Import engine to handle HTML files
+from fastapi import FastAPI, Request, Form # Import classes from FastAPI library required to create a web server and handle requests or input data
+from fastapi.responses import HTMLResponse, StreamingResponse # Import different response types to render webpages and real-time outputs
+from langchain_core.callbacks.base import AsyncCallbackHandler # Import base-class required to "eavesdrop" on the AI agent's actions
 
-from langchain_core.prompts import PromptTemplate # Import the PromptTemplate class to format the prompt
-from langchain_core.runnables import RunnableLambda # Import the RunnableLambda class to create Runnable objects
+os.environ['SSL_CERT_FILE'] = certifi.where() # Guides the program to find the "list of trusted sources" when it tries to connect to a website or an API securely
+load_dotenv() # Load the environment variables
 
-from langchain_core.output_parsers.pydantic import PydanticOutputParser # LangChain output parser that takes in the response from LLM that will parsed into Pydantic model object
+app = FastAPI() # Initialize FastAPI application
+templates = Jinja2Templates(directory="templates") # Initialize Jinja2Templates to render HTML files located in Templates directory
 
-from prompt import REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS # Import the react prompt that will be sent to LLM
-from schema import AgentResponse # Import the Pydantic data-class that agent uses to format final output
+class WebStreamCallbackHandler(AsyncCallbackHandler): # A class that inherits from AsyncCallbackHandler which allows it to hook into LangChain's asynchronous events
 
-from pydantic import BaseModel, Field
-from starlette import status
+    def __init__(self, queue): # Constructor that accepts a queue
+        self.queue = queue # Store the queue object so that handler can push messages into as the agent works
 
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, StreamingResponse
-from langchain_core.callbacks.base import AsyncCallbackHandler
+    async def on_agent_action(self, action, **kwargs): # Method is triggered every time LLM decides to use a tool
+        if "Action:" in action.log: # Check if raw output from LLM contains the string "Action"
+            parts = action.log.split("Action:") # Split the string into two parts based on the "Action" substring
+            thought = parts[0].replace("Thought:", "").strip() # Clean up the first part by removing "Thought" prefix
 
-os.environ['SSL_CERT_FILE'] = certifi.where()
-
-class WebStreamCallbackHandler(AsyncCallbackHandler):
-    def __init__(self, queue):
-        self.queue = queue
-
-    async def on_agent_action(self, action, **kwargs):
-        # Use split to separate the Thought from the Action call
-        # often 'Action:' is the delimiter used by ReAct agents
-        if "Action:" in action.log:
-            parts = action.log.split("Action:")
-            thought = parts[0].replace("Thought:", "").strip()
-
-            # Put Thought and Action into the queue as separate messages
-            if thought:
+            if thought: # A valid thought string is pushed into queue with prefix
                 await self.queue.put(f"THOUGHT: {thought}")
 
-            # Express the action clearly
-            await self.queue.put(f"ACTION: Invoking {action.tool} with input {action.tool_input}")
-        else:
-            # Fallback if the format is unexpected
-            await self.queue.put(f"LOG: {action.log.strip()}")
+            await self.queue.put(f"ACTION: Invoking {action.tool} with input {action.tool_input}") # Pushes clean, readable message into the queue identifying which tool is being used
+        else: # LLM output does not follow the "Action:" format
+            await self.queue.put(f"LOG: {action.log.strip()}") # Raw log is sent to the queue so information is lost
 
-    async def on_tool_end(self, output, **kwargs):
-        # Capture that a tool finished
-        await self.queue.put(f"OBSERVATION: Data retrieved successfully.")
-
-load_dotenv() # Load the environment variables
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-
-def get_agent():
-    tools = [TavilySearch()]  # Register the TavilySearch instance as a tool that the LLM can invoke
-    llm = ChatGoogleGenerativeAI(
-        model='gemini-3-flash-preview')  # LLM model using Google Gemini, optimized for fast responses
-    output_parser = PydanticOutputParser(pydantic_object=AgentResponse)
-    promptTemplate = PromptTemplate(template=REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS, input_variables=["tools", "input", "tool_names", "agent_scratchpad"]).partial(format_instructions=output_parser.get_format_instructions())
-    agent = create_react_agent(llm=llm, tools=tools, prompt=promptTemplate)
-    executor = AgentExecutor(agent=agent, verbose=True, tools=tools, handle_parsing_errors=True)
-    extract_output = RunnableLambda(lambda x: x['output'])
-    parse_output = RunnableLambda(lambda x: output_parser.parse(x))
-    chain = executor | extract_output | parse_output
-    return chain
+    async def on_tool_end(self, output, **kwargs): # Method triggered automatically after a tool finishes executing
+        await self.queue.put(f"OBSERVATION: Data retrieved successfully.") # Capture that a tool finished
 
 
-class CompanyInput(BaseModel):
-    company_name: str = Field(description="Name of the company to search for", min_length=1)
-    url:str = Field(description="URL of the company's website")
+
+class CompanyInput(BaseModel): # Data-Class to store company name and URL
+    company_name: str = Field(description="Name of the company to search for", min_length=1, max_length=100) # Company name field
+    url:str = Field(description="URL of the company's website", min_length=4, max_length=200) # URL of the company's website'
 
 
-@app.get("/", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
-async def index(request:Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/", status_code=status.HTTP_200_OK, response_class=HTMLResponse) # Handle GET requests sent to roor URL and set response code 200
+async def index(request:Request): # Asynchronous Function to render the index.html file
+    return templates.TemplateResponse("index.html", {"request": request}) # Prompt Jinja2Templates to find and render the HTML file
 
-@app.post("/", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
-async def analyze(request:Request, company_name:str=Form(...), url:str=Form(...)):
-    async def event_generator():
-        queue = asyncio.Queue()
-        handler = WebStreamCallbackHandler(queue)
-        task_description = f"Perform technical due diligence on {company_name} at {url}."
+@app.post("/", status_code=status.HTTP_200_OK, response_class=HTMLResponse) # Handle POST requests that contains user input
+async def analyze(request:Request, company_name:str=Form(...), url:str=Form(...)): # Function that extracts company name and URL from HTML form fields
+    input_data = CompanyInput(company_name=company_name, url=url) # Pass the arguments and validate them using a Pydantic model
 
-        # Start agent in background
-        agent_task = asyncio.create_task(
-            get_agent().ainvoke({"input": task_description}, config={"callbacks": [handler]})
-        )
+    async def event_generator(): # Inner function to create a persistent connection they stays open so the server can push updates to brower as they happen
+        queue = asyncio.Queue() # Temporary area for holding messages
+        handler = WebStreamCallbackHandler(queue) # Listens to AI agents to put "Thought" and "Action" into the queue
+        task_description = f"Perform technical due diligence on {input_data.company_name} at {input_data.url}." # Input to Agent
 
-        # 1. Stream the logs as they happen
-        while not agent_task.done() or not queue.empty():
-            try:
-                msg = await asyncio.wait_for(queue.get(), timeout=0.2)
-                yield f"data: {json.dumps({'type': 'log', 'content': msg})}\n\n"
-            except asyncio.TimeoutError:
-                continue
+        agent_task = asyncio.create_task(get_agent().ainvoke({"input": task_description}, config={"callbacks": [handler]})) # Start AI agent in the background
 
-        # 2. Stream the final HTML report
-        result = await agent_task
-        final_html = templates.get_template("report.html").render({
-            "request": request, "company_name": company_name, "data": result
-        })
-        yield f"data: {json.dumps({'type': 'final', 'content': final_html})}\n\n"
+        while (not agent_task.done()) or (not queue.empty()): # Keep the loop running as long as the agent is working or there are messages in the queue not sent to the user
+            try: # Try code block for erroneous code
+                msg = await asyncio.wait_for(queue.get(), timeout=0.2) # Attempt to grab message from queue
+                yield f"data: {json.dumps({'type': 'log', 'content': msg})}\n\n" # Send packets of data to the browser without closing connection (Server-Sent Events (SSE))
+            except asyncio.TimeoutError: # No new messages arrived in the queue for 200ms
+                continue # Loops goes back to the top and tries again
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+        result = await agent_task # Wait for the agent to provide final answer
+        final_html = templates.get_template("report.html").render({ "request": request, "company_name": company_name, "data": result}) # Render the report HTML page using agent data
+        yield f"data: {json.dumps({'type': 'final', 'content': final_html})}\n\n" # Send the final, formatted HTML report to the browser
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream") # Allows FastAPI to keep the HTTP connection open and use event-generator to feed data to the user bit-by-bit
