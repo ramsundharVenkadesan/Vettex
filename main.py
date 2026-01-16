@@ -72,4 +72,8 @@ async def analyze(request:Request, company_name:str=Form(...), url:str=Form(...)
         final_html = templates.get_template("report.html").render({ "request": request, "company_name": company_name, "data": result}) # Render the report HTML page using agent data
         yield f"data: {json.dumps({'type': 'final', 'content': final_html})}\n\n" # Send the final, formatted HTML report to the browser
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream") # Allows FastAPI to keep the HTTP connection open and use event-generator to feed data to the user bit-by-bit
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
+        "X-Accel-Buffering": "no",  # Disables buffering
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+    }) # Allows FastAPI to keep the HTTP connection open and use event-generator to feed data to the user bit-by-bit
