@@ -15,15 +15,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # This step ensures the Dockerfile is present and correctly named
-      - name: Verify Dockerfile
+      # This step creates the Dockerfile directly in the workflow
+      - name: Create Dockerfile dynamically
         run: |
-          if [ -f "Dockerfile" ]; then
-            echo "Dockerfile found!"
-          else
-            echo "ERROR: Dockerfile not found. Ensure the filename is exactly 'Dockerfile' (case-sensitive)."
-            exit 1
-          fi
+          cat <<EOF > Dockerfile
+          FROM python:3.11-slim
+          WORKDIR /app
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
+          COPY . .
+          # We use a backslash before the dollar sign so GitHub doesn't try to interpret it
+          CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port \${PORT:-8080}"]
+          EOF
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -36,7 +39,7 @@ jobs:
         with:
           service: vettex-service
           region: us-central1
-          source: .  # This flag tells Cloud Run to look for your 'Dockerfile' in the root
+          source: .  # This now sees the 'Dockerfile' created in the previous step
           env_vars: |
             GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
             TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
